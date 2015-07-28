@@ -19,6 +19,7 @@
 #include "refspec.h"
 #include "fetchhead.h"
 #include "push.h"
+#include "http_parser.h"
 
 #define CONFIG_URL_FMT "remote.%s.url"
 #define CONFIG_PUSHURL_FMT "remote.%s.pushurl"
@@ -760,6 +761,11 @@ int git_remote__get_http_proxy(git_remote *remote, bool use_ssl, char **proxy_ur
 	git_config *cfg;
 	git_config_entry *ce = NULL;
 	const char *val = NULL;
+    char *urlStr = NULL;
+    git_buf buf = GIT_BUF_INIT;
+    struct http_parser_url url = { 0 };
+    uint16_t urlStartOffset = 0;
+    uint16_t urlLength = 0;
 	int error;
 
 	assert(remote);
@@ -777,7 +783,6 @@ int git_remote__get_http_proxy(git_remote *remote, bool use_ssl, char **proxy_ur
 
 	/* remote.<name>.proxy config setting */
 	if (remote->name && remote->name[0]) {
-		git_buf buf = GIT_BUF_INIT;
 
 		if ((error = git_buf_printf(&buf, "remote.%s.proxy", remote->name)) < 0)
 			return error;
@@ -793,6 +798,49 @@ int git_remote__get_http_proxy(git_remote *remote, bool use_ssl, char **proxy_ur
 			goto found;
 		}
 	}
+
+    /* http.<url>.proxy config setting */
+    if(remote->url && remote->url[0] && !http_parser_parse_url(remote->url, strlen(remote->url), false, &url) && (url.field_set & (1 << UF_HOST))) {
+
+        if(url.field_set & (1 << UF_SCHEMA)) {
+            urlStartOffset = url.field_data[UF_SCHEMA].off;
+            urlLength = (url.field_data[UF_HOST].off - url.field_data[UF_SCHEMA].off) + url.field_data[UF_HOST].len;
+        }
+        else {
+            urlStartOffset = url.field_data[UF_HOST].off;
+            urlLength = url.field_data[UF_HOST].len;
+        }
+
+        if(url.field_set & (1 << UF_PORT)) {
+            urlLength = (url.field_data[UF_PORT].off - urlStartOffset) + url.field_data[UF_PORT].len;
+        }
+
+        urlStr = git__substrdup(remote->url + urlStartOffset, urlLength);
+        GITERR_CHECK_ALLOC(urlStr);
+
+        git_buf_init(&buf, 0);
+
+        error = git_buf_printf(&buf, "http.%s.proxy", urlStr);
+
+        git__free(urlStr);
+        urlStr = NULL;
+
+        if(error < 0) {
+            return error;
+        }
+
+        error = git_config__lookup_entry(&ce, cfg, git_buf_cstr(&buf), false);
+        git_buf_free(&buf);
+
+        if(error < 0) {
+            return error;
+        }
+
+        if(ce && ce->value) {
+            val = ce->value;
+            goto found;
+        }
+    }
 
 	/* http.proxy config setting */
 	if ((error = git_config__lookup_entry(&ce, cfg, "http.proxy", false)) < 0)
