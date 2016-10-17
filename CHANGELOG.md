@@ -10,6 +10,13 @@ v0.24 + 1
   directory matching the starting directory will not prevent git from
   finding a repository in the starting directory or a parent directory.
 
+* Do not fail when deleting remotes in the presence of broken
+  global configs which contain branches.
+
+* Support for reading and writing git index v4 files
+
+* Improve the performance of the revwalk and bring us closer to git's code.
+
 ### API additions
 
 * You can now get the user-agent used by libgit2 using the
@@ -43,13 +50,35 @@ v0.24 + 1
       `git_repository_open_ext` with this flag will error out if either
       `$GIT_WORK_TREE` or `$GIT_COMMON_DIR` is set.
 
+* `git_diff_from_buffer` can create a `git_diff` object from the contents
+  of a git-style patch file.
+
+* `git_index_version()` and `git_index_set_version()` to get and set
+  the index version
+
 ### API removals
 
 * `git_blob_create_fromchunks()` has been removed in favour of
   `git_blob_create_fromstream()`.
 
-
 ### Breaking API changes
+
+* `git_packbuilder_object_count` and `git_packbuilder_written` now
+  return a `size_t` instead of a `uint32_t` for more thorough
+  compatibility with the rest of the library.
+
+* `git_packbuiler_progress` now provides explicitly sized `uint32_t`
+  values instead of `unsigned int`.
+
+* `git_diff_file` now includes an `id_abbrev` field that reflects the
+  number of nibbles set in the `id` field.
+
+* `git_odb_backend` now has a `freshen` function pointer.  This optional
+  function pointer is similar to the `exists` function, but it will update
+  a last-used marker.  For filesystem-based object databases, this updates
+  the timestamp of the file containing the object, to indicate "freshness".
+  If this is `NULL`, then it will not be called and the `exists` function
+  will be used instead.
 
 v0.24
 -------
