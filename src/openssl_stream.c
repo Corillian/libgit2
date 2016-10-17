@@ -496,11 +496,11 @@ int openssl_certificate(git_cert **out, git_stream *stream)
 	return 0;
 }
 
-static int openssl_set_proxy(git_stream *stream, const git_proxy_options *proxy_opts)
+static int openssl_set_proxy(git_stream *stream, const char *proxy_url)
 {
 	openssl_stream *st = (openssl_stream *) stream;
 
-	return git_stream_set_proxy(st->io, proxy_opts);
+	return git_stream_set_proxy(st->io, proxy_url);
 }
 
 ssize_t openssl_write(git_stream *stream, const char *data, size_t len, int flags)
@@ -522,8 +522,9 @@ ssize_t openssl_read(git_stream *stream, void *data, size_t len)
 	openssl_stream *st = (openssl_stream *) stream;
 	int ret;
 
-	if ((ret = SSL_read(st->ssl, data, len)) <= 0)
+	if ((ret = SSL_read(st->ssl, data, len)) <= 0) {
 		return ssl_set_error(st->ssl, ret);
+	}
 
 	return ret;
 }
